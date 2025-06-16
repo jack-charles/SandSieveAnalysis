@@ -1,5 +1,5 @@
 """
-@author: Jack Charles   jcharles@gmail.com
+@author: Jack Charles   jack@jackcharlesconsulting.com
 """
 
 
@@ -11,6 +11,7 @@ import math
 import json
 import numpy as np
 import matplotlib.pyplot as plt
+import wellengcalc as wec
 
 #units in microns. made as a dictionary for lookup
 wentworth_sand_classification = {'Clay': 3.9, 'Silt': 62.0, 'VFG Sand': 125.0, 'FG Sand': 250.0, 
@@ -109,16 +110,15 @@ def read_sieve_data_file(data_filename):
     data_class, _x, = [], []
     for data_content in data_ndarray:
         _x = data_content.tolist()
-        data_class.append(SandSieveClass(_x[0], float(_x[1]), [float(_y) for _y in data_ndarray.dtype.names[2:]], list(_x[2:]), [],
-                                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+        data_class.append(SandSieveClass(_x[0], float(_x[1]), [float(_y) for _y in data_ndarray.dtype.names[2:]], list(_x[2:]), [], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
     return data_class
 
 def read_saved_file_json(data_filename):
     with open(data_filename, 'r',) as file:
         filedata = json.load(file)
-    datalist = []
+    data_list = []
     for key in filedata['SRT Results']:
-        datalist.append(SandSieveClass(filedata['SRT Results'][key]['Name'], filedata['SRT Results'][key]['Depth'], filedata['SRT Results'][key]['Sieve Sizes'], 
+        data_list.append(SandSieveClass(filedata['SRT Results'][key]['Name'], filedata['SRT Results'][key]['Depth'], filedata['SRT Results'][key]['Sieve Sizes'], 
                                        filedata['SRT Results'][key]['Retained Weight'], filedata['SRT Results'][key]['Cumulative Weight Percentage'],
                                        filedata['SRT Results'][key]['d5'], filedata['SRT Results'][key]['d10'], filedata['SRT Results'][key]['d40'], 
                                        filedata['SRT Results'][key]['d50'], filedata['SRT Results'][key]['d90'], filedata['SRT Results'][key]['d95'],
@@ -129,7 +129,7 @@ def read_saved_file_json(data_filename):
     unit = filedata['Sieve Units']
     selected_screens = filedata['Selected Screen']
     selected_proppants = filedata['Selected Proppant']
-    return unit, datalist, selected_screens, selected_proppants
+    return unit, data_list, selected_screens, selected_proppants
 
 def read_saved_file_sql():  #to do
     return
@@ -140,35 +140,35 @@ def append_sieve_data(data, data_filename):
 
 def read_screen_data_file(data_filename):    
     data_ndarray = np.genfromtxt(data_filename, delimiter=',', dtype='|U40, |U40, float', names=True, autostrip=True)
-    data_class, _x, data_dictionary = [], [], {}
+    data_class, _x, screen_dictionary = [], [], {}
     for data_content in data_ndarray:
         _x = data_content.tolist()
         data_class.append(ScreenDataClass(_x[0], _x[1], _x[2]))
     #convert to dictionary for simple selection of data
     for _x in range(len(data_class)):
-        data_dictionary[data_class[_x].name] = data_class[_x]  
-    return data_dictionary
+        screen_dictionary[data_class[_x].name] = data_class[_x]  
+    return screen_dictionary
 
 def read_proppant_data_file(data_filename):    
     data_ndarray = np.genfromtxt(data_filename, delimiter=',', dtype='|U40, float, float, float, float, float', names=True, autostrip=True)
-    data_class, _x, data_dictionary = [], [], {}
+    data_class, _x, proppant_dictionary = [], [], {}
     for data_content in data_ndarray:
         _x = data_content.tolist()
         data_class.append(ProppantDataClass(_x[0], _x[1], _x[2], _x[3], _x[4], _x[5]))
     #convert to dictionary for simple selection of data
     for _x in range(len(data_class)):
         data_class[_x].calculate_proppant_parameters()
-        data_dictionary[data_class[_x].name] = data_class[_x] 
-    return data_dictionary
+        proppant_dictionary[data_class[_x].name] = data_class[_x] 
+    return proppant_dictionary
 
-def calculate_sieve_results(unit, data_class, data_dictionary, selected_proppant):
+def calculate_sieve_results(unit, data_class, proppant_dictionary, selected_proppant):
     for _x in range(len(data_class)):
         data_class[_x].cumulative_wt_perc = []
         data_class[_x].convert_sieve_sizes(unit)
         for _y in range(len(data_class[_x].retained)):
             data_class[_x].cumulative_wt_perc.append(100 * sum(data_class[_x].retained[:_y+1]) / sum(data_class[_x].retained))     #y+1 is needed y is the length of the range, and we need 1 after the length for slicer
         data_class[_x].calculate_sieve_parameters()
-        data_class[_x].calculate_constien_criteria(data_dictionary[selected_proppant].proppant_pack_pore_size)
+        data_class[_x].calculate_constien_criteria(proppant_dictionary[selected_proppant].proppant_pack_pore_size)
     return data_class
 
 def write_sieve_data_json(unit, datalist, data_filename = 'sanddata.json'):
@@ -212,16 +212,15 @@ def print_sieve_data(sand_sieve_data_list):
               [f"{_retained:.2f}" for _retained in sand_sieve_data_list[_x].retained])
 
 def print_sieve_analysis(sand_sieve_data_list):
-    print(f"Name\tDepth\t{sand_sieve_data_list[0].sieve_sizes}\tD50\tUniformity")
+    print(f"Name\tDepth\tD50\tUniformity")
     for _x in range(len(sand_sieve_data_list)):
         print(f"{sand_sieve_data_list[_x].name}\t{sand_sieve_data_list[_x].depth:.2f}\t",
-                [f"{_cumwtperc:.2f}" for _cumwtperc in sand_sieve_data_list[_x].cumulative_wt_perc],"\t",
                 f"{sand_sieve_data_list[_x].d50:.2f}\t{sand_sieve_data_list[_x].uniformity_coeff:.2f}")
 
 def show_plots(srt_results, proppant_dictionary, screen_dictionary, selected_screens, selected_proppants):
     #plots
     fig, ax1 = plt.subplots(2,4)
-    fig.suptitle('Grain Size Distribution and Uniformity Coefficients')
+    fig.suptitle("Grain Size Distribution and Uniformity Coefficients")
     fig.tight_layout()
     #plt.rcParams['axes.labelsize'] = 8
     
@@ -254,28 +253,28 @@ def show_plots(srt_results, proppant_dictionary, screen_dictionary, selected_scr
 
     ax1[0, 0].set_xlabel("Grain Size")
     ax1[0, 0].xaxis.set_inverted(True)
-    ax1[0, 0].set_xscale("log")
+    ax1[0, 0].set_xscale('log')
     ax1[0, 0].set_ylabel("Weight retained")
     ax1[0, 0].yaxis.tick_right()
     ax1[0, 0].set_yticks(np.arange(0,11,1))
-    ax1[0, 0].yaxis.set_label_position("right")
+    ax1[0, 0].yaxis.set_label_position('right')
     ax1[0, 0].grid(True)
-    ax1[0, 0].legend(loc="best", fontsize=8)
+    ax1[0, 0].legend(loc='best', fontsize=8)
     for _key in wentworth_sand_classification:
-        ax1[0, 0].axvline(x = wentworth_sand_classification[_key], color='gray', linestyle="dashed")
+        ax1[0, 0].axvline(x = wentworth_sand_classification[_key], color='gray', linestyle='dashed')
         ax1[0, 0].annotate(xy = (wentworth_sand_classification[_key], srt_results[1].depth), text=_key, 
                         horizontalalignment='left', verticalalignment='bottom', fontsize=6, rotation=90)
 
     ax1[1, 0].set_xlabel("Grain Size")
     ax1[1, 0].xaxis.set_inverted(True)
-    ax1[1, 0].set_xscale("log")
+    ax1[1, 0].set_xscale('log')
     ax1[1, 0].set_ylabel("Cumulative Weight retained")
     ax1[1, 0].yaxis.tick_right()
     ax1[1, 0].set_yticks(np.arange(0,110,10))
-    ax1[1, 0].yaxis.set_label_position("right")
+    ax1[1, 0].yaxis.set_label_position('right')
     ax1[1, 0].grid(True)
     for _key in wentworth_sand_classification:
-        ax1[1, 0].axvline(x = wentworth_sand_classification[_key], color='gray', linestyle="dashed")
+        ax1[1, 0].axvline(x = wentworth_sand_classification[_key], color='gray', linestyle='dashed')
         ax1[1, 0].annotate(xy = (wentworth_sand_classification[_key], 100), text = _key, 
                         horizontalalignment = 'left', verticalalignment = 'top', fontsize = 6, rotation = 90)
 
@@ -284,7 +283,7 @@ def show_plots(srt_results, proppant_dictionary, screen_dictionary, selected_scr
     ax1[0, 1].yaxis.set_inverted(True)
     ax1[0, 1].grid(True)
     for _key in uniformity_classification:
-        ax1[0, 1].axvline(x = _key, color='gray', linestyle="dashed")
+        ax1[0, 1].axvline(x = _key, color='gray', linestyle='dashed')
         ax1[0, 1].annotate(xy = (_key, 100), text = uniformity_classification[_key], 
                           horizontalalignment = 'right', verticalalignment = 'top', fontsize = 6, rotation = 90)
 
@@ -292,7 +291,7 @@ def show_plots(srt_results, proppant_dictionary, screen_dictionary, selected_scr
     ax1[1, 1].set_ylabel("d50")
     ax1[1, 1].grid(True)
     for _key in uniformity_classification:
-        ax1[1, 1].axvline(x = _key, color='gray', linestyle="dashed")
+        ax1[1, 1].axvline(x = _key, color='gray', linestyle='dashed')
         ax1[1, 1].annotate(xy = (_key, 100), text = uniformity_classification[_key], 
                           horizontalalignment = 'right', verticalalignment = 'top', fontsize = 6, rotation = 90)
 
@@ -300,14 +299,14 @@ def show_plots(srt_results, proppant_dictionary, screen_dictionary, selected_scr
     ax1[0, 2].set_ylabel("Depth")
     ax1[0, 2].yaxis.set_inverted(True)
     ax1[0, 2].grid(True)
-    ax1[0, 2].legend(loc="best", fontsize=6)
+    ax1[0, 2].legend(loc='best', fontsize=6)
 
     ax1[1, 2].set_xlabel("Proppant", fontsize=8)
     ax1[1, 2].set_ylabel("D50/d50", fontsize=8)
     ax1[1, 2].tick_params(axis='x', labelsize=6, rotation=90)
     ax1[1, 2].grid(True)
     for ratios in [6, 8, 10]:
-        ax1[1, 2].axhline(y = ratios, color='red', linestyle="-")
+        ax1[1, 2].axhline(y = ratios, color='red', linestyle='-')
 
     ax1[0, 3].set_xlabel("d10 and Screen Size")
     ax1[0, 3].set_ylabel("Depth")
@@ -323,121 +322,10 @@ def show_plots(srt_results, proppant_dictionary, screen_dictionary, selected_scr
     ax1[1, 3].yaxis.set_inverted(True)
     ax1[1, 3].grid(True)
     for proppant in selected_proppants:
-        ax1[1, 3].axvline(x = proppant_dictionary[proppant].D50, color='red', linestyle="-")
+        ax1[1, 3].axvline(x = proppant_dictionary[proppant].D50, color='red', linestyle='-')
         ax1[1, 3].annotate(xy = (proppant_dictionary[proppant].D50, srt_results[1].depth), text = proppant_dictionary[proppant].name, 
                         horizontalalignment = 'right', verticalalignment = 'top', fontsize = 8, rotation = 90)   
 
     plt.show()
 
 
-#initialize lists
-selected_screens = []
-selected_proppants = []
-srt_results = []
-screen_database_filename = 'default_screendatabase.txt'
-proppant_database_filename = 'default_proppantdatabase.txt'
-screen_dictionary = read_screen_data_file(screen_database_filename)
-proppant_dictionary = read_proppant_data_file(proppant_database_filename)
-sieve_unit = "micron"
-menu_loop = True
-
-while menu_loop != False:
-    print(f"\nCurrent Units are {sieve_unit}")
-    print(f"Current Screens are {selected_screens}")
-    print(f"Current Proppants are {selected_proppants}\n")
-    menu_selection = int(input(f"Please type the number of selection\n"
-                        "1: Open/Append Sand Sieve Data\n"
-                        "2: Open Saved File\n"
-                        "3: Import Screen Database\n"
-                        "4: Import Proppant Database\n"
-                        "5: Clear Sieve Data and Selected Data\n"
-                        "6: Select Screen\n"
-                        "7: Select Proppant\n"
-                        "8: Select Units\n"
-                        "10: Perform Calculations\n"
-                        "11: Print SRT Data\n"
-                        "12: Plot Results\n"
-                        "20: Save File\n"
-                        "0: Quit\n"
-                        "Selection: "))
-
-    if menu_selection == 1:
-        sieve_data_filename = input("Path to Sand Sieve Data: ")
-        try:
-            append_sieve_data(srt_results, sieve_data_filename)
-            #srt_results = read_sieve_data_file(sieve_data_filename)
-        except FileNotFoundError:
-            print("File not found")
-    elif menu_selection == 2: 
-        sieve_data_filename = input("Path to Saved File: ")
-        try:
-            sieve_unit, srt_results, selected_screens, selected_proppants = read_saved_file_json(sieve_data_filename)
-        except FileNotFoundError:
-            print("File not found")
-    elif menu_selection == 3:
-        screen_database_filename = input("Path to Screen Database File: ")
-        try:
-            screen_dictionary = read_screen_data_file(screen_database_filename)
-        except FileNotFoundError:
-            print("File not found")
-    elif menu_selection == 4: 
-        proppant_database_filename = input("Path to Proppant Database File: ")
-        try:
-            proppant_dictionary = read_proppant_data_file(proppant_database_filename)
-        except FileNotFoundError:
-            print("File not found")
-    elif menu_selection == 5: 
-        selected_screens.clear()
-        selected_proppants.clear()
-        srt_results.clear()
-        print("Sieve Data and Selections Cleared")
-    elif menu_selection == 6:
-        print(f"Available Screens: ",[f"{screen_dictionary[_x].name}" for _x in screen_dictionary],"\t")
-        print(f"Screens Selected = {selected_screens}")
-        selected_screens.append(input("Name of selected screen: "))
-    elif menu_selection == 7: 
-        print(f"Available Proppants: ",[f"{proppant_dictionary[_x].name}" for _x in proppant_dictionary],"\t")
-        print(f"Proppants Selected = {selected_proppants}")
-        selected_proppants.append(input("Name of selected proppant: "))
-    elif menu_selection == 8:
-        print("Available units are micron, mm, inch, phi, mesh")
-        sieve_unit = input("Enter Sieve Units: ")
-    elif menu_selection == 10:
-        srt_results = calculate_sieve_results(sieve_unit, srt_results, proppant_dictionary, selected_proppants[0])
-        #only using the first proppant in list to perform Constein factor calculation
-    elif menu_selection == 11:
-        print_sieve_analysis(srt_results)
-    elif menu_selection == 12:
-        show_plots(srt_results, proppant_dictionary, screen_dictionary, selected_screens, selected_proppants)
-    elif menu_selection == 20: 
-        sieve_data_filename = input("Filename to Save To: ")
-        export_sieve_results_file(sieve_unit, srt_results, selected_screens, selected_proppants, sieve_data_filename)
-    elif menu_selection == 0:
-        print("Thank you")
-        menu_loop = False
-    
-    #Demo mode for testing
-    elif menu_selection == 100:
-        print("Demo Mode")
-        screen_database_filename = 'default_screendatabase.txt'
-        proppant_database_filename = 'default_proppantdatabase.txt'
-        sieve_data_filename = 'default_sievefile.txt'
-        save_filename = 'default_sanddata.json'
-        sieve_unit = 'micron'
-        
-        #srt_results = read_sieve_data_file(sieve_data_filename)
-        append_sieve_data(srt_results, sieve_data_filename)
-        screen_dictionary = read_screen_data_file(screen_database_filename)
-        proppant_dictionary = read_proppant_data_file(proppant_database_filename)
-        selected_screens.append("6 Gauge WWS")
-        selected_proppants.append("Gravel 20/40")
-        selected_proppants.append("Carbolite 20/40")
-        srt_results = calculate_sieve_results(sieve_unit, srt_results, proppant_dictionary, selected_proppants[0])
-        export_sieve_results_file(sieve_unit, srt_results, selected_screens, selected_proppants, save_filename)
-        sieve_unit, srt_results, selected_screens, selected_proppants  = read_saved_file_json('default_sanddata_new.json')
-        #print_sieve_analysis(srt_results)
-        srt_results[1].print_sieve_results()
-        show_plots(srt_results, proppant_dictionary, screen_dictionary, selected_screens, selected_proppants)
-
-    else:
-        print("Invalid Selection")
