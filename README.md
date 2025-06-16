@@ -1,4 +1,4 @@
-# Sand-Sieve-Analysis
+# SandSieveAnalysis
 
 This is a script to interpret results from a sand sieve test, calculating the cumulative weight percentages, various size and sorting factors, and allow plotting of results with selected screens and proppants.
 
