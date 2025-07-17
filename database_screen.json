@@ -1,0 +1,5 @@
+{
+    "4 Gauge WWS": {"name": "4 Gauge WWS", "type": "Wire Wrapped Screen", "aperture_micron": 101.6},
+    "6 Gauge WWS": {"name": "6 Gauge WWS", "type": "Wire Wrapped Screen", "aperture_micron": 152.4},
+    "Excluder 150": {"name": "Excluder 150", "type": "Mesh", "aperture_micron": 150}
+}
